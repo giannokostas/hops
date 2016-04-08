@@ -15,20 +15,17 @@
  */
 package io.hops.ha.common;
 
-import io.hops.StorageConnector;
 import io.hops.exception.StorageException;
-import io.hops.metadata.yarn.dal.ContainerIdToCleanDataAccess;
-import io.hops.metadata.yarn.dal.ContainerStatusDataAccess;
-import io.hops.metadata.yarn.dal.FiCaSchedulerNodeDataAccess;
-import io.hops.metadata.yarn.dal.FinishedApplicationsDataAccess;
-import io.hops.metadata.yarn.dal.JustLaunchedContainersDataAccess;
-import io.hops.metadata.yarn.dal.LaunchedContainersDataAccess;
-import io.hops.metadata.yarn.dal.NodeHBResponseDataAccess;
-import io.hops.metadata.yarn.dal.PendingEventDataAccess;
-import io.hops.metadata.yarn.dal.RMContainerDataAccess;
-import io.hops.metadata.yarn.dal.ResourceDataAccess;
-import io.hops.metadata.yarn.dal.UpdatedContainerInfoDataAccess;
-import io.hops.metadata.yarn.entity.RMNode;
+import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
+import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.ContainerStatus;
+import org.apache.hadoop.yarn.api.records.NodeId;
+import org.apache.hadoop.yarn.server.resourcemanager.ApplicationMasterService;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppImpl;
+import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
+import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
+import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerImpl;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -37,16 +34,8 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.ContainerStatus;
-import org.apache.hadoop.yarn.api.records.NodeId;
-import org.apache.hadoop.yarn.server.resourcemanager.ApplicationMasterService;
+
 import static org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore.LOG;
-import org.apache.hadoop.yarn.server.resourcemanager.rmapp.RMAppImpl;
-import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttempt;
-import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
-import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerImpl;
 
 public class transactionStateWrapper extends TransactionStateImpl {
 
@@ -329,5 +318,25 @@ public class transactionStateWrapper extends TransactionStateImpl {
           ApplicationAttemptId appAttemptId) {
     ts.addAllJustFinishedContainersToRemove(status, appAttemptId);
   }
-  
+
+  @Override
+  public void addYarnApplicationResourcesToAdd(int inode_id, String name, int allocated_mb, int allocated_vcores){
+    ts.addYarnApplicationResourcesToAdd(inode_id, name, allocated_mb, allocated_vcores);
+  }
+
+  @Override
+  public void persistYarnApplicationResourcesToAdd() throws StorageException{
+    ts.persistYarnApplicationResourcesToAdd();
+  }
+
+  @Override
+  public void addYarnApplicationResourcesToRemove(int inode_id, String name, int allocated_mb, int allocated_vcores){
+    ts.addYarnApplicationResourcesToRemove(inode_id, name, allocated_mb, allocated_vcores);
+  }
+
+  @Override
+  public void persistYarnApplicationResourcesToRemove() throws StorageException{
+    ts.persistYarnApplicationResourcesToRemove();
+  }
+
 }

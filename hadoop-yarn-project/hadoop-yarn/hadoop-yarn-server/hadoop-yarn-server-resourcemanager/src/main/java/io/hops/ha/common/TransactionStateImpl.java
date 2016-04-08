@@ -20,52 +20,24 @@ import io.hops.common.GlobalThreadPool;
 import io.hops.exception.StorageException;
 import io.hops.metadata.util.RMStorageFactory;
 import io.hops.metadata.util.RMUtilities;
-import io.hops.metadata.yarn.dal.ContainerDataAccess;
-import io.hops.metadata.yarn.dal.ContainerIdToCleanDataAccess;
-import io.hops.metadata.yarn.dal.ContainerStatusDataAccess;
-import io.hops.metadata.yarn.dal.FiCaSchedulerNodeDataAccess;
-import io.hops.metadata.yarn.dal.FinishedApplicationsDataAccess;
-import io.hops.metadata.yarn.dal.JustFinishedContainersDataAccess;
-import io.hops.metadata.yarn.dal.JustLaunchedContainersDataAccess;
-import io.hops.metadata.yarn.dal.LaunchedContainersDataAccess;
-import io.hops.metadata.yarn.dal.NodeDataAccess;
-import io.hops.metadata.yarn.dal.NodeHBResponseDataAccess;
-import io.hops.metadata.yarn.dal.PendingEventDataAccess;
-import io.hops.metadata.yarn.dal.QueueMetricsDataAccess;
-import io.hops.metadata.yarn.dal.RMContainerDataAccess;
-import io.hops.metadata.yarn.dal.RMContextInactiveNodesDataAccess;
-import io.hops.metadata.yarn.dal.RMNodeDataAccess;
-import io.hops.metadata.yarn.dal.ResourceDataAccess;
-import io.hops.metadata.yarn.dal.UpdatedContainerInfoDataAccess;
+import io.hops.metadata.yarn.dal.*;
 import io.hops.metadata.yarn.dal.fair.FSSchedulerNodeDataAccess;
-import io.hops.metadata.yarn.dal.rmstatestore.AllocateResponseDataAccess;
-import io.hops.metadata.yarn.dal.rmstatestore.AllocatedContainersDataAccess;
-import io.hops.metadata.yarn.dal.rmstatestore.ApplicationAttemptStateDataAccess;
-import io.hops.metadata.yarn.dal.rmstatestore.ApplicationStateDataAccess;
-import io.hops.metadata.yarn.dal.rmstatestore.CompletedContainersStatusDataAccess;
-import io.hops.metadata.yarn.dal.rmstatestore.RanNodeDataAccess;
-import io.hops.metadata.yarn.dal.rmstatestore.UpdatedNodeDataAccess;
+import io.hops.metadata.yarn.dal.rmstatestore.*;
 import io.hops.metadata.yarn.entity.Container;
-import io.hops.metadata.yarn.entity.FiCaSchedulerNode;
-import io.hops.metadata.yarn.entity.FiCaSchedulerNodeInfos;
-import io.hops.metadata.yarn.entity.JustFinishedContainer;
-import io.hops.metadata.yarn.entity.LaunchedContainers;
-import io.hops.metadata.yarn.entity.PendingEvent;
-import io.hops.metadata.yarn.entity.RMContainer;
-import io.hops.metadata.yarn.entity.RMNode;
-import io.hops.metadata.yarn.entity.RMNodeToAdd;
+import io.hops.metadata.yarn.entity.*;
 import io.hops.metadata.yarn.entity.Resource;
-import io.hops.metadata.yarn.entity.rmstatestore.AllocateResponse;
-import io.hops.metadata.yarn.entity.rmstatestore.ApplicationAttemptState;
-import io.hops.metadata.yarn.entity.rmstatestore.ApplicationState;
-import io.hops.metadata.yarn.entity.rmstatestore.UpdatedNode;
-import io.hops.metadata.yarn.entity.rmstatestore.RanNode;
+import io.hops.metadata.yarn.entity.rmstatestore.*;
+import org.apache.commons.lang.StringUtils;
 import org.apache.hadoop.io.DataOutputBuffer;
 import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.AllocateResponsePBImpl;
-import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
+import org.apache.hadoop.yarn.api.records.*;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
+import org.apache.hadoop.yarn.api.records.ContainerId;
+import org.apache.hadoop.yarn.api.records.ContainerStatus;
 import org.apache.hadoop.yarn.api.records.NodeId;
+import org.apache.hadoop.yarn.api.records.impl.pb.ContainerPBImpl;
+import org.apache.hadoop.yarn.api.records.impl.pb.ContainerStatusPBImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.ApplicationMasterService.AllocateResponseLock;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.impl.pb.ApplicationAttemptStateDataPBImpl;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.records.impl.pb.ApplicationStateDataPBImpl;
@@ -76,21 +48,10 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeImpl;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentSkipListMap;
-import org.apache.commons.lang.StringUtils;
-import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.ContainerStatus;
-import org.apache.hadoop.yarn.api.records.impl.pb.ContainerPBImpl;
-import org.apache.hadoop.yarn.api.records.impl.pb.ContainerStatusPBImpl;
 
 import static org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore.LOG;
 
@@ -151,7 +112,15 @@ public class TransactionStateImpl extends TransactionState {
           new ConcurrentHashMap<ContainerId, JustFinishedContainer>();
   private final Map<ContainerId, JustFinishedContainer> justFinishedContainerToRemove = 
           new ConcurrentHashMap<ContainerId, JustFinishedContainer>();
-  
+  private final Map<Integer, YarnApplicationResources> yarnApplicationResourcesToAdd =
+            new HashMap<Integer, YarnApplicationResources>();
+  private final Map<Integer, YarnApplicationResources> yarnApplicationResourcesToRemove =
+            new HashMap<Integer, YarnApplicationResources>();
+
+
+  public Map<Integer, YarnApplicationResources> getYarnApplicationResourcesToAdd(){
+      return yarnApplicationResourcesToAdd;
+  }
   
   //COMTEXT
   private final RMContextInfo rmcontextInfo = new RMContextInfo();
@@ -231,6 +200,8 @@ public class TransactionStateImpl extends TransactionState {
     persistUpdatedNodeToRemove();
     persistJustFinishedContainersToAdd();
     persistJustFinishedContainersToRemove();
+    persistYarnApplicationResourcesToAdd();
+    persistYarnApplicationResourcesToRemove();
   }
 
   public void persistSchedulerApplicationInfo(QueueMetricsDataAccess QMDA, StorageConnector connector)
@@ -409,7 +380,7 @@ public class TransactionStateImpl extends TransactionState {
 
     byte[] attemptStateByteArray = attemptStateData.getProto().toByteArray();
     if(attemptStateByteArray.length > 13000){
-      LOG.error("application Attempt State too big: " + appAttempt.getAppAttemptId() + " " + appAttemptTokens.array().length + " " + 
+      LOG.error("application Attempt State too big: " + appAttempt.getAppAttemptId() + " " + appAttemptTokens.array().length + " " +
               appAttempt.getDiagnostics().getBytes().length + " " +
               " ");
     }
@@ -448,7 +419,7 @@ public class TransactionStateImpl extends TransactionState {
       jfcDA.addAll(justFinishedContainerToAdd.values());
     }
   }
-  
+
   public void addAllJustFinishedContainersToRemove(List<ContainerStatus> status,
           ApplicationAttemptId appAttemptId) {
     for (ContainerStatus container : status) {
@@ -488,7 +459,7 @@ public class TransactionStateImpl extends TransactionState {
 
   public void addRanNode(NodeId nid, ApplicationAttemptId appAttemptId) {
     if(!this.ranNodeToAdd.containsKey(appAttemptId)){
-      this.ranNodeToAdd.put(appAttemptId, new HashMap<Integer,RanNode>());
+      this.ranNodeToAdd.put(appAttemptId, new HashMap<Integer, RanNode>());
     }
     RanNode node = new RanNode(appAttemptId.toString(), nid.toString());
     this.ranNodeToAdd.get(appAttemptId).put(node.hashCode(),node);
@@ -570,6 +541,30 @@ public class TransactionStateImpl extends TransactionState {
       }
       uNDA.removeAll(toRemove);
   }
+
+    public void addYarnApplicationResourcesToAdd(YarnApplicationResources yarnAppResources) {
+        yarnApplicationResourcesToAdd.put(yarnAppResources.getInode_id(), yarnAppResources);
+    }
+
+    public void persistYarnApplicationResourcesToAdd() throws StorageException{
+        if (!yarnApplicationResourcesToAdd.isEmpty()) {
+            YarnApplicationResourcesDataAccess yarnAppResources= (YarnApplicationResourcesDataAccess) RMStorageFactory.
+                    getDataAccess(YarnApplicationResourcesDataAccess.class);
+            yarnAppResources.addAll(yarnApplicationResourcesToAdd);
+        }
+    }
+
+    public void addYarnApplicationResourcesToRemove(YarnApplicationResources yarnAppResources) {
+        yarnApplicationResourcesToRemove.put(yarnAppResources.getInode_id(), yarnAppResources);
+    }
+
+    public void persistYarnApplicationResourcesToRemove() throws StorageException{
+        if(!yarnApplicationResourcesToRemove.isEmpty()){
+            YarnApplicationResourcesDataAccess yarnAppResources= (YarnApplicationResourcesDataAccess) RMStorageFactory.
+                    getDataAccess(YarnApplicationResourcesDataAccess.class);
+            yarnAppResources.removeAll(yarnApplicationResourcesToRemove);
+        }
+    }
   
   public void addAllocateResponse(ApplicationAttemptId id,
           AllocateResponseLock allocateResponse) {
@@ -653,7 +648,7 @@ public class TransactionStateImpl extends TransactionState {
   
   public void removeAllocateResponse(ApplicationAttemptId id, int responseId) {
     if(allocateResponsesToAdd.remove(id)==null){
-    this.allocateResponsesToRemove.put(id,new AllocateResponse(id.toString(), responseId));
+    this.allocateResponsesToRemove.put(id, new AllocateResponse(id.toString(), responseId));
     }
     appIds.add(id.getApplicationId());
   }
@@ -874,7 +869,7 @@ public class TransactionStateImpl extends TransactionState {
         rmNodeInfo.agregate(agregate);
       }
       agregate.persist(hbDA, cidToCleanDA, justLaunchedContainersDA,
-              updatedContainerInfoDA, faDA, csDA,persistedEventsDA, connector);
+              updatedContainerInfoDA, faDA, csDA, persistedEventsDA, connector);
     }
   }
 
