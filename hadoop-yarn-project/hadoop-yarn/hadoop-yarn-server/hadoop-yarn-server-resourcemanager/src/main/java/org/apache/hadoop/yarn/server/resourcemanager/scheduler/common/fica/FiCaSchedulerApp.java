@@ -20,41 +20,27 @@ package org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica;
 
 import io.hops.ha.common.TransactionState;
 import io.hops.ha.common.TransactionStateImpl;
-import java.io.IOException;
+import io.hops.metadata.util.RMUtilities;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
-import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
-import org.apache.hadoop.yarn.api.records.Container;
-import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.ContainerStatus;
-import org.apache.hadoop.yarn.api.records.NodeId;
-import org.apache.hadoop.yarn.api.records.Priority;
-import org.apache.hadoop.yarn.api.records.ResourceRequest;
+import org.apache.hadoop.yarn.api.records.*;
 import org.apache.hadoop.yarn.server.resourcemanager.RMAuditLogger;
 import org.apache.hadoop.yarn.server.resourcemanager.RMAuditLogger.AuditConstants;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
 import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
-import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
-import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerEventType;
-import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerFinishedEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerImpl;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ActiveUsersManager;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Allocation;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.NodeType;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Queue;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicationAttempt;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.Recoverable;
+import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.*;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.*;
 import org.apache.hadoop.yarn.util.resource.ResourceCalculator;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import org.apache.hadoop.yarn.api.records.Resource;
-import org.apache.hadoop.yarn.server.resourcemanager.recovery.Recoverable;
 
 /**
  * Represents an application attempt from the viewpoint of the FIFO or Capacity
@@ -85,7 +71,7 @@ public class FiCaSchedulerApp extends SchedulerApplicationAttempt
 
   synchronized public boolean containerCompleted(RMContainer rmContainer,
       ContainerStatus containerStatus, RMContainerEventType event,
-      TransactionState transactionState) {
+      TransactionState transactionState) throws IOException {
 
     // Remove from the list of containers
     if (null == liveContainers.remove(rmContainer.getContainerId())) {
@@ -119,7 +105,7 @@ public class FiCaSchedulerApp extends SchedulerApplicationAttempt
 
   synchronized public RMContainer allocate(NodeType type,
       FiCaSchedulerNode node, Priority priority, ResourceRequest request,
-      Container container, TransactionState transactionState) {
+      Container container, TransactionState transactionState) throws IOException {
     LOG.debug("HOP :: FiCaSchedulerApp.allocate -START");
     if (isStopped) {
       return null;
@@ -160,6 +146,12 @@ public class FiCaSchedulerApp extends SchedulerApplicationAttempt
               getFiCaSchedulerAppInfo(
               this.appSchedulingInfo.getApplicationAttemptId()).
           updateAppInfo(this);
+
+      // For every new allocated container for an application A update the total resources that
+      // the application A uses.
+      RMUtilities.updateApplicationResources(rmContainer.getApplicationAttemptId().getApplicationId().toString(),
+                    rmContainer.getAllocatedResource().getMemory(),
+                    rmContainer.getAllocatedResource().getVirtualCores());
     }
     // Inform the container
     LOG.debug("HOP :: RMContainerEventType.START");
@@ -272,7 +264,7 @@ public class FiCaSchedulerApp extends SchedulerApplicationAttempt
    */
   public synchronized Allocation getAllocation(ResourceCalculator rc,
     Resource clusterResource, Resource minimumAllocation,
-    TransactionState transactionState) {
+    TransactionState transactionState) throws IOException {
 
     Set<ContainerId> currentContPreemption = Collections
         .unmodifiableSet(new HashSet<ContainerId>(containersToPreempt));

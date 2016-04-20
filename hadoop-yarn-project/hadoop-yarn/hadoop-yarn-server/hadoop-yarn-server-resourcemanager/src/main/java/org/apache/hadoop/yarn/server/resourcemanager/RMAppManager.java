@@ -286,7 +286,7 @@ public class RMAppManager
   @SuppressWarnings("unchecked")
   protected void submitApplication(
       ApplicationSubmissionContext submissionContext, long submitTime,
-      String user, TransactionState transactionState) throws YarnException {
+      String user, TransactionState transactionState) throws YarnException, IOException {
     ApplicationId applicationId = submissionContext.getApplicationId();
 
     RMAppImpl application =

@@ -119,7 +119,7 @@ public interface YarnScheduler extends EventHandler<SchedulerEvent> {
   Allocation allocate(ApplicationAttemptId appAttemptId,
       List<ResourceRequest> ask, List<ContainerId> release,
       List<String> blacklistAdditions, List<String> blacklistRemovals,
-      TransactionState transactionState);
+      TransactionState transactionState) throws IOException;
 
   /**
    * Get node resource usage report.

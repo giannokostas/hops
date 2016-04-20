@@ -112,15 +112,6 @@ public class TransactionStateImpl extends TransactionState {
           new ConcurrentHashMap<ContainerId, JustFinishedContainer>();
   private final Map<ContainerId, JustFinishedContainer> justFinishedContainerToRemove = 
           new ConcurrentHashMap<ContainerId, JustFinishedContainer>();
-  private final Map<Integer, YarnApplicationResources> yarnApplicationResourcesToAdd =
-            new HashMap<Integer, YarnApplicationResources>();
-  private final Map<Integer, YarnApplicationResources> yarnApplicationResourcesToRemove =
-            new HashMap<Integer, YarnApplicationResources>();
-
-
-  public Map<Integer, YarnApplicationResources> getYarnApplicationResourcesToAdd(){
-      return yarnApplicationResourcesToAdd;
-  }
   
   //COMTEXT
   private final RMContextInfo rmcontextInfo = new RMContextInfo();
@@ -200,8 +191,6 @@ public class TransactionStateImpl extends TransactionState {
     persistUpdatedNodeToRemove();
     persistJustFinishedContainersToAdd();
     persistJustFinishedContainersToRemove();
-    persistYarnApplicationResourcesToAdd();
-    persistYarnApplicationResourcesToRemove();
   }
 
   public void persistSchedulerApplicationInfo(QueueMetricsDataAccess QMDA, StorageConnector connector)
@@ -542,30 +531,6 @@ public class TransactionStateImpl extends TransactionState {
       uNDA.removeAll(toRemove);
   }
 
-    public void addYarnApplicationResourcesToAdd(YarnApplicationResources yarnAppResources) {
-        yarnApplicationResourcesToAdd.put(yarnAppResources.getInode_id(), yarnAppResources);
-    }
-
-    public void persistYarnApplicationResourcesToAdd() throws StorageException{
-        if (!yarnApplicationResourcesToAdd.isEmpty()) {
-            YarnApplicationResourcesDataAccess yarnAppResources= (YarnApplicationResourcesDataAccess) RMStorageFactory.
-                    getDataAccess(YarnApplicationResourcesDataAccess.class);
-            yarnAppResources.addAll(yarnApplicationResourcesToAdd);
-        }
-    }
-
-    public void addYarnApplicationResourcesToRemove(YarnApplicationResources yarnAppResources) {
-        yarnApplicationResourcesToRemove.put(yarnAppResources.getInode_id(), yarnAppResources);
-    }
-
-    public void persistYarnApplicationResourcesToRemove() throws StorageException{
-        if(!yarnApplicationResourcesToRemove.isEmpty()){
-            YarnApplicationResourcesDataAccess yarnAppResources= (YarnApplicationResourcesDataAccess) RMStorageFactory.
-                    getDataAccess(YarnApplicationResourcesDataAccess.class);
-            yarnAppResources.removeAll(yarnApplicationResourcesToRemove);
-        }
-    }
-  
   public void addAllocateResponse(ApplicationAttemptId id,
           AllocateResponseLock allocateResponse) {
     AllocateResponsePBImpl lastResponse

@@ -20,111 +20,38 @@ import io.hops.exception.StorageException;
 import io.hops.ha.common.TransactionState;
 import io.hops.ha.common.TransactionStateImpl;
 import io.hops.metadata.yarn.TablesDef;
-import io.hops.metadata.yarn.dal.AppSchedulingInfoBlacklistDataAccess;
-import io.hops.metadata.yarn.dal.AppSchedulingInfoDataAccess;
-import io.hops.metadata.yarn.dal.ContainerDataAccess;
-import io.hops.metadata.yarn.dal.ContainerIdToCleanDataAccess;
-import io.hops.metadata.yarn.dal.ContainerStatusDataAccess;
-import io.hops.metadata.yarn.dal.FiCaSchedulerAppLastScheduledContainerDataAccess;
-import io.hops.metadata.yarn.dal.FiCaSchedulerAppReservationsDataAccess;
-import io.hops.metadata.yarn.dal.FiCaSchedulerAppSchedulingOpportunitiesDataAccess;
-import io.hops.metadata.yarn.dal.FiCaSchedulerNodeDataAccess;
-import io.hops.metadata.yarn.dal.FinishedApplicationsDataAccess;
-import io.hops.metadata.yarn.dal.FullRMNodeDataAccess;
-import io.hops.metadata.yarn.dal.JustFinishedContainersDataAccess;
-import io.hops.metadata.yarn.dal.JustLaunchedContainersDataAccess;
-import io.hops.metadata.yarn.dal.LaunchedContainersDataAccess;
-import io.hops.metadata.yarn.dal.NextHeartbeatDataAccess;
-import io.hops.metadata.yarn.dal.NodeDataAccess;
-import io.hops.metadata.yarn.dal.NodeHBResponseDataAccess;
-import io.hops.metadata.yarn.dal.PendingEventDataAccess;
-import io.hops.metadata.yarn.dal.QueueMetricsDataAccess;
-import io.hops.metadata.yarn.dal.RMContainerDataAccess;
-import io.hops.metadata.yarn.dal.RMContextActiveNodesDataAccess;
-import io.hops.metadata.yarn.dal.RMContextInactiveNodesDataAccess;
-import io.hops.metadata.yarn.dal.RMLoadDataAccess;
-import io.hops.metadata.yarn.dal.RMNodeDataAccess;
-import io.hops.metadata.yarn.dal.ResourceDataAccess;
-import io.hops.metadata.yarn.dal.ResourceRequestDataAccess;
-import io.hops.metadata.yarn.dal.SchedulerApplicationDataAccess;
-import io.hops.metadata.yarn.dal.UpdatedContainerInfoDataAccess;
+import io.hops.metadata.yarn.dal.*;
 import io.hops.metadata.yarn.dal.capacity.CSLeafQueuesPendingAppsDataAccess;
 import io.hops.metadata.yarn.dal.capacity.FiCaSchedulerAppReservedContainersDataAccess;
 import io.hops.metadata.yarn.dal.fair.AppSchedulableDataAccess;
 import io.hops.metadata.yarn.dal.fair.FSSchedulerNodeDataAccess;
-import io.hops.metadata.yarn.dal.rmstatestore.AllocateRPCDataAccess;
-import io.hops.metadata.yarn.dal.rmstatestore.AllocateResponseDataAccess;
-import io.hops.metadata.yarn.dal.rmstatestore.AllocatedContainersDataAccess;
-import io.hops.metadata.yarn.dal.rmstatestore.ApplicationAttemptStateDataAccess;
-import io.hops.metadata.yarn.dal.rmstatestore.ApplicationStateDataAccess;
-import io.hops.metadata.yarn.dal.rmstatestore.DelegationKeyDataAccess;
-import io.hops.metadata.yarn.dal.rmstatestore.DelegationTokenDataAccess;
-import io.hops.metadata.yarn.dal.rmstatestore.HeartBeatRPCDataAccess;
-import io.hops.metadata.yarn.dal.rmstatestore.RMStateVersionDataAccess;
-import io.hops.metadata.yarn.dal.rmstatestore.RPCDataAccess;
-import io.hops.metadata.yarn.dal.rmstatestore.RanNodeDataAccess;
-import io.hops.metadata.yarn.dal.rmstatestore.SecretMamagerKeysDataAccess;
-import io.hops.metadata.yarn.dal.rmstatestore.SequenceNumberDataAccess;
-import io.hops.metadata.yarn.dal.rmstatestore.UpdatedNodeDataAccess;
+import io.hops.metadata.yarn.dal.rmstatestore.*;
 import io.hops.metadata.yarn.dal.util.YARNOperationType;
-import io.hops.metadata.yarn.entity.AppSchedulingInfo;
-import io.hops.metadata.yarn.entity.AppSchedulingInfoBlacklist;
+import io.hops.metadata.yarn.entity.*;
 import io.hops.metadata.yarn.entity.Container;
 import io.hops.metadata.yarn.entity.ContainerId;
 import io.hops.metadata.yarn.entity.ContainerStatus;
-import io.hops.metadata.yarn.entity.FiCaSchedulerAppLastScheduledContainer;
-import io.hops.metadata.yarn.entity.FiCaSchedulerAppSchedulingOpportunities;
-import io.hops.metadata.yarn.entity.FiCaSchedulerNode;
-import io.hops.metadata.yarn.entity.FinishedApplications;
-import io.hops.metadata.yarn.entity.JustFinishedContainer;
-import io.hops.metadata.yarn.entity.JustLaunchedContainers;
-import io.hops.metadata.yarn.entity.LaunchedContainers;
-import io.hops.metadata.yarn.entity.Load;
-import io.hops.metadata.yarn.entity.Node;
-import io.hops.metadata.yarn.entity.NodeHBResponse;
-import io.hops.metadata.yarn.entity.PendingEvent;
-import io.hops.metadata.yarn.entity.QueueMetrics;
-import io.hops.metadata.yarn.entity.RMContainer;
-import io.hops.metadata.yarn.entity.RMContextActiveNodes;
-import io.hops.metadata.yarn.entity.RMContextInactiveNodes;
-import io.hops.metadata.yarn.entity.RMNode;
-import io.hops.metadata.yarn.entity.RMNodeComps;
 import io.hops.metadata.yarn.entity.Resource;
 import io.hops.metadata.yarn.entity.ResourceRequest;
-import io.hops.metadata.yarn.entity.SchedulerAppReservations;
-import io.hops.metadata.yarn.entity.SchedulerApplication;
-import io.hops.metadata.yarn.entity.UpdatedContainerInfo;
 import io.hops.metadata.yarn.entity.appmasterrpc.AllocateRPC;
 import io.hops.metadata.yarn.entity.appmasterrpc.HeartBeatRPC;
 import io.hops.metadata.yarn.entity.appmasterrpc.RPC;
 import io.hops.metadata.yarn.entity.capacity.FiCaSchedulerAppReservedContainers;
-import io.hops.metadata.yarn.entity.rmstatestore.AllocateResponse;
-import io.hops.metadata.yarn.entity.rmstatestore.ApplicationAttemptState;
-import io.hops.metadata.yarn.entity.rmstatestore.ApplicationState;
-import io.hops.metadata.yarn.entity.rmstatestore.UpdatedNode;
-import io.hops.metadata.yarn.entity.rmstatestore.DelegationKey;
-import io.hops.metadata.yarn.entity.rmstatestore.DelegationToken;
-import io.hops.metadata.yarn.entity.rmstatestore.RMStateVersion;
-import io.hops.metadata.yarn.entity.rmstatestore.RanNode;
-import io.hops.metadata.yarn.entity.rmstatestore.SecretMamagerKey;
-import io.hops.metadata.yarn.entity.rmstatestore.SequenceNumber;
+import io.hops.metadata.yarn.entity.rmstatestore.*;
 import io.hops.transaction.handler.LightWeightRequestHandler;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.net.NetUtils;
 import org.apache.hadoop.net.NodeBase;
 import org.apache.hadoop.yarn.api.protocolrecords.impl.pb.AllocateResponsePBImpl;
-import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
+import org.apache.hadoop.yarn.api.records.*;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.ContainerState;
 import org.apache.hadoop.yarn.api.records.NodeId;
-import org.apache.hadoop.yarn.api.records.ResourceOption;
+import org.apache.hadoop.yarn.api.records.impl.pb.ContainerPBImpl;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
-import org.apache.hadoop.yarn.proto.YarnServerCommonProtos;
-import org.apache.hadoop.yarn.proto.YarnServerCommonServiceProtos;
-import org.apache.hadoop.yarn.proto.YarnServerResourceManagerServiceProtos;
+import org.apache.hadoop.yarn.proto.*;
 import org.apache.hadoop.yarn.proto.YarnServerResourceManagerServiceProtos.ApplicationStateDataProto;
-import org.apache.hadoop.yarn.proto.YarnServiceProtos;
 import org.apache.hadoop.yarn.security.client.RMDelegationTokenIdentifier;
 import org.apache.hadoop.yarn.server.api.protocolrecords.NodeHeartbeatResponse;
 import org.apache.hadoop.yarn.server.api.protocolrecords.impl.pb.NodeHeartbeatResponsePBImpl;
@@ -146,26 +73,14 @@ import org.apache.hadoop.yarn.util.ConverterUtils;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.EnumMap;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import org.apache.hadoop.net.NetUtils;
-import org.apache.hadoop.yarn.api.records.impl.pb.ContainerPBImpl;
-import org.apache.hadoop.yarn.proto.YarnProtos;
+
 import static org.apache.hadoop.yarn.server.resourcemanager.ResourceTrackerService.resolve;
 
 public class RMUtilities {
@@ -386,7 +301,7 @@ public class RMUtilities {
                         YarnServiceProtos.AllocateResponseProto
                         .parseFrom(hopAllocateResponse.getAllocateResponse()));
         allocateResponses.put(ConverterUtils.toApplicationAttemptId(
-                hopAllocateResponse.getApplicationattemptid()),
+                        hopAllocateResponse.getApplicationattemptid()),
                 allocateResponse);
       }
     }
@@ -421,7 +336,7 @@ public class RMUtilities {
     
    
     
-  private static Map<String, List<String>> getAllAllocatedContainers() throws
+  public static Map<String, List<String>> getAllAllocatedContainers() throws
           IOException {
     AllocatedContainersDataAccess da
             = (AllocatedContainersDataAccess) RMStorageFactory.
@@ -753,6 +668,49 @@ public static Map<String, List<ResourceRequest>> getAllResourceRequestsFullTrans
             };
     allocateRPCHandler.handle();
   }
+
+    public static void persistApplicationResources (final YarnApplicationResources appResources) throws IOException{
+
+        LightWeightRequestHandler applicationResourceHandler = new LightWeightRequestHandler(YARNOperationType.TEST) {
+            @Override
+            public Object performTask() throws IOException {
+                connector.beginTransaction();
+                connector.writeLock();
+
+                YarnApplicationResourcesDataAccess yarnDataAccess = (YarnApplicationResourcesDataAccess)
+                        RMStorageFactory.getDataAccess(YarnApplicationResourcesDataAccess.class);
+
+                yarnDataAccess.add(appResources);
+
+                connector.commit();
+
+                return null;
+            }
+        };
+
+        applicationResourceHandler.handle();
+    }
+
+    public static void updateApplicationResources(final String appId, final int mem, final int vCores) throws IOException {
+        LightWeightRequestHandler applicationResourceHandler = new LightWeightRequestHandler(YARNOperationType.TEST) {
+            @Override
+            public Object performTask() throws IOException {
+                connector.beginTransaction();
+                connector.writeLock();
+
+                YarnApplicationResourcesDataAccess yarnDataAccess = (YarnApplicationResourcesDataAccess)
+                        RMStorageFactory.getDataAccess(YarnApplicationResourcesDataAccess.class);
+
+                yarnDataAccess.update(appId, mem, vCores);
+
+                connector.commit();
+
+                return null;
+            }
+        };
+
+        applicationResourceHandler.handle();
+    }
   
   public static void updatePendingEvents(final PendingEvent persistedEvent,
       final int action) throws IOException {

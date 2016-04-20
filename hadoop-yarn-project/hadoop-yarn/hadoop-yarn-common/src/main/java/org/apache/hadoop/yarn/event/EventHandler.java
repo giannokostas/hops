@@ -21,6 +21,8 @@ package org.apache.hadoop.yarn.event;
 import org.apache.hadoop.classification.InterfaceAudience.Public;
 import org.apache.hadoop.classification.InterfaceStability.Evolving;
 
+import java.io.IOException;
+
 /**
  * Interface for handling events of type T
  *
@@ -32,6 +34,6 @@ import org.apache.hadoop.classification.InterfaceStability.Evolving;
 @Evolving
 public interface EventHandler<T extends Event> {
 
-  void handle(T event);
+  void handle(T event) throws IOException;
 
 }

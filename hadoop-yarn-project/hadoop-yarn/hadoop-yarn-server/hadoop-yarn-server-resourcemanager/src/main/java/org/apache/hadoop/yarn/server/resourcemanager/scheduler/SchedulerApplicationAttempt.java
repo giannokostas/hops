@@ -21,49 +21,30 @@ import com.google.common.collect.Multiset;
 import io.hops.ha.common.FiCaSchedulerAppInfo;
 import io.hops.ha.common.TransactionState;
 import io.hops.ha.common.TransactionStateImpl;
-import io.hops.metadata.yarn.entity.Resource;
 import io.hops.metadata.yarn.entity.FiCaSchedulerAppLastScheduledContainer;
-import io.hops.metadata.yarn.entity.SchedulerAppReservations;
 import io.hops.metadata.yarn.entity.FiCaSchedulerAppSchedulingOpportunities;
+import io.hops.metadata.yarn.entity.Resource;
+import io.hops.metadata.yarn.entity.SchedulerAppReservations;
 import io.hops.metadata.yarn.entity.capacity.FiCaSchedulerAppReservedContainers;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.classification.InterfaceAudience.Private;
 import org.apache.hadoop.classification.InterfaceStability.Stable;
 import org.apache.hadoop.classification.InterfaceStability.Unstable;
-import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.ApplicationResourceUsageReport;
-import org.apache.hadoop.yarn.api.records.Container;
-import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.NMToken;
-import org.apache.hadoop.yarn.api.records.NodeId;
-import org.apache.hadoop.yarn.api.records.Priority;
-import org.apache.hadoop.yarn.api.records.ResourceRequest;
+import org.apache.hadoop.yarn.api.records.*;
 import org.apache.hadoop.yarn.server.resourcemanager.RMContext;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
+import org.apache.hadoop.yarn.server.resourcemanager.recovery.Recoverable;
 import org.apache.hadoop.yarn.server.resourcemanager.rmapp.attempt.RMAppAttemptState;
-import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
-import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerEventType;
-import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerImpl;
-import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerReservedEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.*;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeCleanContainerEvent;
+import org.apache.hadoop.yarn.util.ConverterUtils;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import org.apache.hadoop.yarn.util.ConverterUtils;
-import org.apache.hadoop.yarn.server.resourcemanager.recovery.RMStateStore;
-import org.apache.hadoop.yarn.server.resourcemanager.recovery.Recoverable;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FSSchedulerApp;
 
 /**
  * Represents an application attempt from the viewpoint of the scheduler. Each
@@ -279,7 +260,7 @@ public class SchedulerApplicationAttempt implements Recoverable{
 
   public synchronized RMContainer reserve(SchedulerNode node, Priority priority,
       RMContainer rmContainer, Container container,
-      TransactionState transactionState) {
+      TransactionState transactionState) throws IOException {
     // Create RMContainer if necessary
     if (rmContainer == null) {
       rmContainer = new RMContainerImpl(container, getApplicationAttemptId(),
@@ -381,7 +362,7 @@ public class SchedulerApplicationAttempt implements Recoverable{
 
   @SuppressWarnings("unchecked")
   public synchronized void containerLaunchedOnNode(ContainerId containerId,
-      NodeId nodeId, TransactionState transactionState) {
+      NodeId nodeId, TransactionState transactionState) throws IOException {
     // Inform the container
     RMContainer rmContainer = getRMContainer(containerId);
     if (rmContainer == null) {
@@ -598,7 +579,7 @@ public class SchedulerApplicationAttempt implements Recoverable{
   // some reason like DNS unavailable, do not return this container and keep it
   // in the newlyAllocatedContainers waiting to be refetched.
   public synchronized ContainersAndNMTokensAllocation pullNewlyAllocatedContainersAndNMTokens(
-      TransactionState transactionState) {
+      TransactionState transactionState) throws IOException {
     List<Container> returnContainerList =
         new ArrayList<Container>(newlyAllocatedContainers.size());
     List<NMToken> nmTokens = new ArrayList<NMToken>();

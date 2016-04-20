@@ -15,7 +15,6 @@
  */
 package io.hops.ha.common;
 
-import io.hops.exception.StorageException;
 import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
 import org.apache.hadoop.yarn.api.records.ApplicationId;
 import org.apache.hadoop.yarn.api.records.ContainerStatus;
@@ -317,26 +316,6 @@ public class transactionStateWrapper extends TransactionStateImpl {
   public void addAllJustFinishedContainersToRemove(List<ContainerStatus> status,
           ApplicationAttemptId appAttemptId) {
     ts.addAllJustFinishedContainersToRemove(status, appAttemptId);
-  }
-
-  @Override
-  public void addYarnApplicationResourcesToAdd(int inode_id, String name, int allocated_mb, int allocated_vcores){
-    ts.addYarnApplicationResourcesToAdd(inode_id, name, allocated_mb, allocated_vcores);
-  }
-
-  @Override
-  public void persistYarnApplicationResourcesToAdd() throws StorageException{
-    ts.persistYarnApplicationResourcesToAdd();
-  }
-
-  @Override
-  public void addYarnApplicationResourcesToRemove(int inode_id, String name, int allocated_mb, int allocated_vcores){
-    ts.addYarnApplicationResourcesToRemove(inode_id, name, allocated_mb, allocated_vcores);
-  }
-
-  @Override
-  public void persistYarnApplicationResourcesToRemove() throws StorageException{
-    ts.persistYarnApplicationResourcesToRemove();
   }
 
 }

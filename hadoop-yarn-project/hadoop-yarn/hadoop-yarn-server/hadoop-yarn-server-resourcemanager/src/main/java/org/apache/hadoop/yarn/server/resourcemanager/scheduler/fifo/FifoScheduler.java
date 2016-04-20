@@ -30,19 +30,7 @@ import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.security.authorize.AccessControlList;
-import org.apache.hadoop.yarn.api.records.ApplicationAttemptId;
-import org.apache.hadoop.yarn.api.records.ApplicationId;
-import org.apache.hadoop.yarn.api.records.ApplicationResourceUsageReport;
-import org.apache.hadoop.yarn.api.records.Container;
-import org.apache.hadoop.yarn.api.records.ContainerId;
-import org.apache.hadoop.yarn.api.records.ContainerStatus;
-import org.apache.hadoop.yarn.api.records.NodeId;
-import org.apache.hadoop.yarn.api.records.Priority;
-import org.apache.hadoop.yarn.api.records.QueueACL;
-import org.apache.hadoop.yarn.api.records.QueueInfo;
-import org.apache.hadoop.yarn.api.records.QueueState;
-import org.apache.hadoop.yarn.api.records.QueueUserACLInfo;
-import org.apache.hadoop.yarn.api.records.ResourceRequest;
+import org.apache.hadoop.yarn.api.records.*;
 import org.apache.hadoop.yarn.conf.YarnConfiguration;
 import org.apache.hadoop.yarn.exceptions.YarnRuntimeException;
 import org.apache.hadoop.yarn.factories.RecordFactory;
@@ -63,26 +51,12 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainerStat
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNodeCleanContainerEvent;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.AbstractYarnScheduler;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ActiveUsersManager;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Allocation;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.NodeType;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.*;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Queue;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerAppReport;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerAppUtils;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplicationAttempt.ContainersAndNMTokensAllocation;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerNodeReport;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerUtils;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerApp;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAddedSchedulerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAttemptAddedSchedulerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppAttemptRemovedSchedulerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.AppRemovedSchedulerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.ContainerExpiredSchedulerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeAddedSchedulerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeRemovedSchedulerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.NodeUpdateSchedulerEvent;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEvent;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.*;
 import org.apache.hadoop.yarn.server.utils.BuilderUtils;
 import org.apache.hadoop.yarn.server.utils.Lock;
 import org.apache.hadoop.yarn.util.ConverterUtils;
@@ -91,17 +65,9 @@ import org.apache.hadoop.yarn.util.resource.ResourceCalculator;
 import org.apache.hadoop.yarn.util.resource.Resources;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentSkipListMap;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.QueueMetrics;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.fica.FiCaSchedulerNode;
 
 @LimitedPrivate("yarn")
 @Evolving
@@ -272,7 +238,7 @@ public class FifoScheduler extends AbstractYarnScheduler
   public Allocation allocate(ApplicationAttemptId applicationAttemptId,
       List<ResourceRequest> ask, List<ContainerId> release,
       List<String> blacklistAdditions, List<String> blacklistRemovals,
-      TransactionState transactionState) {
+      TransactionState transactionState) throws IOException {
     FiCaSchedulerApp application = getApplicationAttempt(applicationAttemptId);
     if (application == null) {
       LOG.error(
@@ -371,7 +337,7 @@ public class FifoScheduler extends AbstractYarnScheduler
   }
 
   private synchronized void addApplication(ApplicationId applicationId,
-      String queue, String user, TransactionState transactionState) {
+      String queue, String user, TransactionState transactionState) throws IOException {
     org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication
         application =
         new org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication(
@@ -393,7 +359,7 @@ public class FifoScheduler extends AbstractYarnScheduler
   private synchronized void addApplicationAttempt(
       ApplicationAttemptId appAttemptId,
       boolean transferStateFromPreviousAttempt,
-      TransactionState transactionState) {
+      TransactionState transactionState) throws IOException {
     org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication
         application = applications.get(appAttemptId.getApplicationId());
     String user = application.getUser();
@@ -477,7 +443,7 @@ public class FifoScheduler extends AbstractYarnScheduler
    */
   private void assignContainers(
       FiCaSchedulerNode node,
-      TransactionState transactionState) {
+      TransactionState transactionState) throws IOException {
     LOG.debug(
         "assignContainers:" + " node=" + node.getRMNode().getNodeAddress() +
             " #applications=" + applications.size());
@@ -581,7 +547,7 @@ public class FifoScheduler extends AbstractYarnScheduler
   private int assignContainersOnNode(
       FiCaSchedulerNode node,
       FiCaSchedulerApp application, Priority priority,
-      TransactionState transactionState) {
+      TransactionState transactionState) throws IOException {
     // Data-local
     int nodeLocalContainers =
         assignNodeLocalContainers(node, application, priority,
@@ -609,7 +575,7 @@ public class FifoScheduler extends AbstractYarnScheduler
   private int assignNodeLocalContainers(
       FiCaSchedulerNode node,
       FiCaSchedulerApp application, Priority priority,
-      TransactionState transactionState) {
+      TransactionState transactionState) throws IOException {
     int assignedContainers = 0;
     ResourceRequest request =
         application.getResourceRequest(priority, node.getNodeName());
@@ -634,7 +600,7 @@ public class FifoScheduler extends AbstractYarnScheduler
   private int assignRackLocalContainers(
       FiCaSchedulerNode node,
       FiCaSchedulerApp application, Priority priority,
-      TransactionState transactionState) {
+      TransactionState transactionState) throws IOException {
     int assignedContainers = 0;
     ResourceRequest request = application
         .getResourceRequest(priority, node.getRMNode().getRackName());
@@ -659,7 +625,7 @@ public class FifoScheduler extends AbstractYarnScheduler
   private int assignOffSwitchContainers(
       FiCaSchedulerNode node,
       FiCaSchedulerApp application, Priority priority,
-      TransactionState transactionState) {
+      TransactionState transactionState) throws IOException {
     int assignedContainers = 0;
     ResourceRequest request =
         application.getResourceRequest(priority, ResourceRequest.ANY);
@@ -675,7 +641,7 @@ public class FifoScheduler extends AbstractYarnScheduler
       FiCaSchedulerNode node,
       FiCaSchedulerApp application, Priority priority, int assignableContainers,
       ResourceRequest request, NodeType type,
-      TransactionState transactionState) {
+      TransactionState transactionState) throws IOException {
     LOG.debug(
         "assignContainers:" + " node=" + node.getRMNode().getNodeAddress() +
             " application=" + application.getApplicationId().getId() +
@@ -726,7 +692,7 @@ public class FifoScheduler extends AbstractYarnScheduler
   }
 
   private synchronized void nodeUpdate(RMNode rmNode,
-      TransactionState transactionState) {    
+      TransactionState transactionState) throws IOException {
     FiCaSchedulerNode
         node = getNode(rmNode.getNodeID());
     LOG.debug("HOP :: nodeUpdate, rmNode:" + rmNode.getNodeID().toString() + 
@@ -780,7 +746,7 @@ public class FifoScheduler extends AbstractYarnScheduler
   }
 
   @Override
-  public void handle(SchedulerEvent event) {
+  public void handle(SchedulerEvent event) throws IOException {
     LOG.debug("HOP :: FifoScheduler received event of type:" + event.getType());
     switch (event.getType()) {
       case NODE_ADDED: {
@@ -863,7 +829,7 @@ public class FifoScheduler extends AbstractYarnScheduler
 
   private void containerLaunchedOnNode(ContainerId containerId,
       FiCaSchedulerNode node,
-      TransactionState transactionState) {
+      TransactionState transactionState) throws IOException {
     // Get the application for the finished container
     FiCaSchedulerApp application = getCurrentAttemptForContainer(containerId);
     if (application == null) {
@@ -885,7 +851,7 @@ public class FifoScheduler extends AbstractYarnScheduler
   @Lock(FifoScheduler.class)
   private synchronized void containerCompleted(RMContainer rmContainer,
       ContainerStatus containerStatus, RMContainerEventType event,
-      TransactionState transactionState) {
+      TransactionState transactionState) throws IOException {
     if (rmContainer == null) {
       LOG.info("Null container completed..." + containerStatus.getContainerId());
       return;
@@ -933,7 +899,7 @@ public class FifoScheduler extends AbstractYarnScheduler
       //recovered
 
   private synchronized void removeNode(RMNode nodeInfo,
-      TransactionState transactionState) {
+      TransactionState transactionState) throws IOException {
     FiCaSchedulerNode
         node = getNode(nodeInfo.getNodeID());
     if (node == null) {
